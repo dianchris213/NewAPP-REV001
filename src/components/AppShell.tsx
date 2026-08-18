@@ -1,13 +1,60 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
 import { Icon } from "./Icon";
+import { AddTransactionSheet } from "./AddTransactionSheet";
+import { useApp } from "@/lib/app-store";
 
 const tabs = [
-  { to: "/", label: "Home", icon: "home" },
-  { to: "/analytics", label: "Analytics", icon: "equalizer" },
+  { to: "/", label: "Beranda", icon: "home" },
+  { to: "/analytics", label: "Analitik", icon: "equalizer" },
   { to: "/wallet", label: "Dompet", icon: "account_balance_wallet" },
-  { to: "/settings", label: "Settings", icon: "settings" },
+  { to: "/settings", label: "Pengaturan", icon: "settings" },
 ] as const;
+
+export function TopBar({
+  eyebrow,
+  title,
+  actions,
+}: {
+  eyebrow?: string;
+  title: string;
+  actions?: ReactNode;
+}) {
+  const { user } = useApp();
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-outline-variant/30 bg-surface-container-high text-on-surface-variant">
+          <Icon name="person" className="text-[20px]" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-meta text-on-surface-variant/80">
+            {eyebrow ?? user?.handle ?? "Catatan Keuangan"}
+          </span>
+          <h1 className="m-0 text-section text-on-surface">{title}</h1>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 text-on-surface-variant">
+        {actions ?? (
+          <>
+            <button
+              aria-label="Sinkronisasi"
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-surface-variant/60"
+            >
+              <Icon name="cloud" className="text-[20px]" />
+            </button>
+            <button
+              aria-label="Notifikasi"
+              className="flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-surface-variant/60"
+            >
+              <Icon name="notifications" className="text-[20px]" />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function AppShell({
   children,
@@ -17,6 +64,12 @@ export function AppShell({
   topBar?: ReactNode;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { hydrated, user, setAddTxOpen } = useApp();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (hydrated && !user) navigate({ to: "/login" });
+  }, [hydrated, user, navigate]);
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background text-on-background antialiased">
@@ -30,12 +83,16 @@ export function AppShell({
         {children}
       </main>
 
-      <nav className="fixed bottom-0 left-0 z-50 flex h-[72px] w-full items-center justify-around border-t border-outline-variant/15 bg-surface-container-lowest/85 px-gutter-grid pb-safe-area-bottom backdrop-blur-xl">
+      <nav
+        aria-label="Navigasi utama"
+        className="fixed bottom-0 left-0 z-50 flex h-[72px] w-full items-center justify-around border-t border-outline-variant/15 bg-surface-container-lowest/85 px-gutter-grid pb-safe-area-bottom backdrop-blur-xl"
+      >
         {tabs.slice(0, 2).map((t) => (
           <NavItem key={t.to} {...t} active={pathname === t.to} />
         ))}
         <button
           type="button"
+          onClick={() => setAddTxOpen(true)}
           className="group -mt-8 flex w-16 flex-col items-center justify-center transition-all active:scale-95"
           aria-label="Tambah transaksi"
         >
@@ -47,6 +104,8 @@ export function AppShell({
           <NavItem key={t.to} {...t} active={pathname === t.to} />
         ))}
       </nav>
+
+      <AddTransactionSheet />
     </div>
   );
 }
@@ -65,6 +124,8 @@ function NavItem({
   return (
     <Link
       to={to}
+      aria-label={label}
+      aria-current={active ? "page" : undefined}
       className={`flex w-16 flex-col items-center justify-center gap-1 transition-all active:scale-90 ${
         active ? "text-primary" : "text-on-surface-variant/70"
       }`}
