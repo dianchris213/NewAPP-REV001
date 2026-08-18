@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { AppShell, TopBar } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { useApp, type Settings as SettingsState } from "@/lib/app-store";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/settings")({
       },
     ],
   }),
-  component: Settings,
+  component: SettingsPage,
 });
 
 function Row({
@@ -45,11 +46,26 @@ function Row({
   );
 }
 
-function Toggle() {
+function Toggle({ id, label }: { id: keyof SettingsState; label: string }) {
+  const { settings, toggleSetting } = useApp();
+  const on = settings[id];
   return (
-    <span className="h-6 w-11 rounded-full border border-outline-variant/40 bg-surface-variant p-0.5">
-      <span className="block h-5 w-5 rounded-full bg-outline" />
-    </span>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={() => toggleSetting(id)}
+      className={`h-6 w-11 rounded-full border p-0.5 transition-colors ${
+        on ? "border-primary bg-primary-container/60" : "border-outline-variant/40 bg-surface-variant"
+      }`}
+    >
+      <span
+        className={`block h-5 w-5 rounded-full transition-transform ${
+          on ? "translate-x-5 bg-primary" : "translate-x-0 bg-outline"
+        }`}
+      />
+    </button>
   );
 }
 
@@ -58,29 +74,33 @@ const Chevron = <Icon name="chevron_right" className="text-[20px] text-on-surfac
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section className="mt-stack-lg">
-      <h2 className="mb-2 text-[10px] uppercase tracking-wider text-primary">{label}</h2>
-      <div className="glass-panel rounded-[16px] px-4">{children}</div>
+      <h2 className="mb-2 text-label uppercase text-primary">{label}</h2>
+      <div className="glass-card rounded-[16px] px-4">{children}</div>
     </section>
   );
 }
 
-function Settings() {
-  return (
-    <AppShell>
-      <span className="text-[10px] uppercase tracking-wider text-primary">Konfigurasi</span>
-      <h1 className="text-2xl font-bold text-on-surface">Pengaturan</h1>
+function SettingsPage() {
+  const { user, logout, settings } = useApp();
+  const navigate = useNavigate();
 
-      <div className="glass-panel mt-stack-md flex items-center gap-3 rounded-[16px] p-4">
+  return (
+    <AppShell topBar={<TopBar eyebrow="Konfigurasi" title="Pengaturan" />}>
+      <div className="gradient-hero flex items-center gap-3 rounded-[24px] p-4">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-variant text-on-surface-variant">
           <Icon name="person" />
         </span>
         <div className="flex flex-1 flex-col">
-          <span className="text-base font-semibold text-on-surface">Belum masuk</span>
-          <span className="text-xs text-on-surface-variant">Profil belum tersambung</span>
+          <span className="text-base font-semibold text-on-surface">
+            {user?.name ?? "Belum masuk"}
+          </span>
+          <span className="text-xs text-on-surface-variant">
+            {user ? `Masuk via ${user.provider === "telegram" ? "Telegram" : "Google"}` : "Profil belum tersambung"}
+          </span>
         </div>
-        <button className="rounded-full bg-surface-container-high px-4 py-1.5 text-xs font-semibold text-on-surface">
-          Ubah
-        </button>
+        <span className="rounded-full bg-surface-container-high px-4 py-1.5 text-xs font-semibold text-on-surface">
+          {user?.handle ?? "-"}
+        </span>
       </div>
 
       <Group label="App Preferences">
@@ -89,21 +109,32 @@ function Settings() {
           title="Bahasa & Mata Uang"
           trailing={<span className="text-xs text-on-surface-variant">IDR / Indonesia</span>}
         />
-        <Row icon="dark_mode" title="Tema Tampilan" trailing={<Toggle />} />
-        <Row icon="notifications" title="Notifikasi Push" trailing={<Toggle />} />
+        <Row
+          icon="dark_mode"
+          title="Tema Tampilan"
+          subtitle={settings.darkTheme ? "Mode gelap aktif" : "Mode terang aktif"}
+          trailing={<Toggle id="darkTheme" label="Tema gelap" />}
+        />
+        <Row
+          icon="notifications"
+          title="Notifikasi Push"
+          subtitle={settings.pushNotifications ? "Aktif" : "Nonaktif"}
+          trailing={<Toggle id="pushNotifications" label="Notifikasi push" />}
+        />
       </Group>
 
       <Group label="Security">
-        <Row icon="fingerprint" title="Kunci Aplikasi / Biometrik" trailing={<Toggle />} />
+        <Row
+          icon="fingerprint"
+          title="Kunci Aplikasi / Biometrik"
+          subtitle={settings.biometricLock ? "Terkunci dengan biometrik" : "Nonaktif"}
+          trailing={<Toggle id="biometricLock" label="Kunci biometrik" />}
+        />
         <Row
           icon="cloud_sync"
           title="Status Sinkronisasi Cloud"
-          subtitle="Belum tersinkronisasi"
-          trailing={
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary-container/30 text-primary">
-              <Icon name="sync" className="text-[18px]" />
-            </span>
-          }
+          subtitle={settings.cloudSync ? "Tersinkronisasi" : "Belum tersinkronisasi"}
+          trailing={<Toggle id="cloudSync" label="Sinkronisasi cloud" />}
         />
       </Group>
 
@@ -122,7 +153,13 @@ function Settings() {
         />
       </Group>
 
-      <button className="mt-stack-lg flex w-full items-center justify-center gap-2 rounded-[16px] bg-surface-container-high py-4 text-base font-semibold text-on-surface">
+      <button
+        onClick={() => {
+          logout();
+          navigate({ to: "/login" });
+        }}
+        className="mt-stack-lg flex w-full items-center justify-center gap-2 rounded-[16px] bg-surface-container-high py-4 text-base font-semibold text-on-surface"
+      >
         <Icon name="logout" className="text-[20px]" /> Keluar Akun
       </button>
       <button className="mt-3 flex w-full items-center justify-center gap-2 rounded-[16px] border border-error/30 py-4 text-base font-semibold text-error">
